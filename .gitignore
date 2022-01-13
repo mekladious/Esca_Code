@@ -1,0 +1,10 @@
+downloads
+raw_stories
+tokenized_stories
+BERT/json_data
+BERT/bert_data
+BERT/src/models/__pycache__
+*.pyc
+*.local
+.DS_Store
+*.log

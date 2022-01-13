@@ -45,11 +45,17 @@ Stanford CoreNLP is a Word segmentation tools, Dowload it from [CoreNLP](https:/
 ```
 export CLASSPATH=/path/to/stanford-corenlp-full-2017-06-09/stanford-corenlp-3.8.0.jar
 ```
+```
+export CLASSPATH='/Users/mekladious/Workspace/packages/stanford-corenlp-4.3.2/stanford-corenlp-4.3.2.jar'
+```
 * Replacing `/path/to/` with the path to where you saved the standford-corenlp-full-2o17-o6-o9 directory.
 
 #### 3> Sentence Splitting and Tokenization
 ```
 python preprocess.py -mode tokenize -raw_path RAW_PATH -save_path TOKENIZED_PATH
+```
+```
+python BERT/src/preprocess.py -mode tokenize -raw_path raw_stories/cnn_4200 -save_path tokenized_stories/ -log_file logs/cnndm.log
 ```
 * `Raw_path` is the directory containing story files.
 * `Json_path` is the target directory to save generated json files.
@@ -58,11 +64,17 @@ python preprocess.py -mode tokenize -raw_path RAW_PATH -save_path TOKENIZED_PATH
 ```
 python preprocess.py -mode format_to_lines -raw_path RAW_PATH -save_path JSON_PATH -n_cpus 1 -use_bert_basic_tokenizer false -map_path MAP_PATH
 ```
+```
+python BERT/src/preprocess.py -mode format_to_lines -raw_path raw_stories/cnn_4200 -save_path tokenized_stories/ -use_bert_basic_tokenizer false -map_path BERT/urls -log_file logs/cnndm.log
+```
 * `Map_path` is the directory containing the urls files, which we have provided.
 
 #### 5> Format to pt Files
 ```
 python preprocess.py -mode format_to_bert -raw_path JSON_PATH -save_path DATA_PATH  -lower -n_cpus 1 -log_file ../logs/preprocess.log
+```
+```
+python BERT/src/preprocess.py -mode format_to_bert -raw_path tokenized_stories/  -save_path BERT/src/bert_data  -lower -n_cpus 1 -log_file logs/preprocess.log
 ```
 * `Bert_data_path` is the target directory to save the generated binary files (bert_data).
 
@@ -71,6 +83,9 @@ python preprocess.py -mode format_to_bert -raw_path JSON_PATH -save_path DATA_PA
 ### 1. Pretrain the extractor
 ```
 python train.py --pairwise -task ext -mode train -data_path DATA_PATH -ext_dropout 0.1 -model_path MODEL_PATH -lr 2e-3 -visible_gpus x -report_every 100 -save_checkpoint_steps 1000 -batch_size 3000 -train_steps 100000 -accum_count 2 -log_file LOG_PATH -use_interval true -warmup_steps 10000 -max_pos 512
+```
+```
+python BERT/src/train.py --pairwise -task ext -mode train -bert_data_path BERT/bert_data -ext_dropout 0.1 -model_path BERT/src/models -lr 2e-3 -report_every 100 -save_checkpoint_steps 1000 -batch_size 3000 -train_steps 100000 -accum_count 2 -log_file logs/modeling.log -use_interval true -warmup_steps 10000 -max_pos 512
 ```
 
 * We use the cross entropy loss to train the extractor, expecting better parameters. Then we proposed a new loss `pairwise loss` to learn the relationship between sentences.
