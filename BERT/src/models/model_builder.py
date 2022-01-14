@@ -428,7 +428,8 @@ class HybridSummarizer(nn.Module):
 
         # mask characters such as CLS um
         len0 = src.size(1)
-        len0 = torch.Tensor([[len0]]).repeat(src.size(0), 1).long().to('cuda')
+        len0 = torch.Tensor([[len0]]).repeat(src.size(0), 1).long()
+        # .to('cuda')
         clss_up = torch.cat((clss, len0), dim=1)
         sent_len = (clss_up[:, 1:] - clss) * mask_cls.long()
         for i in range(mask_cls.size(0)):
