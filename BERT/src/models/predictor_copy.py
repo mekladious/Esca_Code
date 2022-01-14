@@ -288,8 +288,7 @@ class Translator(object):
             xids = src.unsqueeze(0).transpose(0, 1)
 
             len0 = src.size(1)
-            len0 = torch.Tensor([[len0]]).repeat(src.size(0), 1).long()
-            # .to('cuda')
+            len0 = torch.Tensor([[len0]]).repeat(src.size(0), 1).long().to('cuda')
             clss_up = torch.cat((clss, len0), dim=1)
             sent_len = (clss_up[:, 1:] - clss) * mask_cls.long()
             for i in range(mask_cls.size(0)):
@@ -308,8 +307,7 @@ class Translator(object):
                     ext_scores_new = torch.cat((ext_scores_new, tmp_vec.unsqueeze(0)), dim=0)
             ext_scores_new = ext_scores_new * mask_src.float()
             attn_dist = attn_dist * (ext_scores_new + 1).unsqueeze(1)
-            ext_dist = Variable(torch.zeros(src.size(0), 1, self.model.abstractor.bert.model.config.vocab_size))
-            # .to('cuda'))
+            ext_dist = Variable(torch.zeros(src.size(0), 1, self.model.abstractor.bert.model.config.vocab_size).to('cuda'))
             ext_vocab_prob = ext_dist.scatter_add(2, xids, (1 - g) * attn_dist)
 
             # Generator forward.
