@@ -94,7 +94,7 @@ class ExtTransformerEncoder(nn.Module):
         x = x + pos_emb
 
         for i in range(self.num_inter_layers):
-            x = self.transformer_inter[i](i, x, x, 1 - mask)  # all_sents * max_tokens * dim
+            x = self.transformer_inter[i](i, x, x, ~ mask)  # all_sents * max_tokens * dim
         # Here we get the sent_vec instead of sent_scores.
         x = self.layer_norm(x)
         sent_vec = x * (mask.unsqueeze(1).transpose(1,2).float())
