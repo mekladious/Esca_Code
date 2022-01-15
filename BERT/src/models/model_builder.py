@@ -240,7 +240,7 @@ class ExtSummarizer(nn.Module):
             tmp_q = q[:true_dim, :true_dim]
             a, b = tmp_D.shape
             # i = np.eye(a, a)
-            D_ = torch.linalg.pinv(tmp_D)
+            D_ = torch.pinverse(tmp_D)
             # D_ = torch.inverse(tmp_D)
             I = torch.eye(true_dim).to(self.device)
             y = torch.ones(true_dim, 1).to(self.device) * (1.0 / true_dim)
