@@ -162,7 +162,9 @@ class Trainer(object):
                             if step > train_steps:
                                 break
                 train_iter = train_iter_fct()
-            except:
+            except Exception:
+                print(Exception)
+                train_iter = train_iter_fct()
                 step-=1
 
         return total_stats
