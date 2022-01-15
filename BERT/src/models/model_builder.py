@@ -222,16 +222,16 @@ class ExtSummarizer(nn.Module):
             q = q * mask_my_own[i]
             tmp_nov = torch.mm(sent_vec[i][0].unsqueeze(0), self.W_novel)
 
-            accumulation = torch.mm(tmp_nov, nn.functional.tanh(
+            accumulation = torch.mm(tmp_nov, torch.tanh(
                 ((q[0].sum() / sent_num[i]) * sent_vec[i][0]).unsqueeze(0).transpose(0, 1)))
             for j, each_row in enumerate(q):
                 if j == 0:
                     continue
                 q[j] = (q[j] + accumulation) * mask_cls[i]
                 tmp_nov = torch.mm(sent_vec[i][j].unsqueeze(0), self.W_novel)
-                accumulation += torch.mm(tmp_nov, nn.functional.tanh(
+                accumulation += torch.mm(tmp_nov, torch.tanh(
                     ((q[j].sum() / sent_num[i]) * sent_vec[i][j]).unsqueeze(0).transpose(0, 1)))
-            q = nn.functional.sigmoid(q) * mask_my_own[i]
+            q = torch.sigmoid(q) * mask_my_own[i]
 
             sum_vec = q.sum(dim=0)
             D = torch.diag_embed(sum_vec)

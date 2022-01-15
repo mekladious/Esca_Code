@@ -221,7 +221,7 @@ class PairwiseLoss(nn.Module):
         outputt = output.unsqueeze(1).transpose(1,2)
         outputt = outputt.repeat(1,1,outputt.size(1))
 
-        pairwise_output = nn.functional.sigmoid(5 * (outputt - output_)) * mask
+        pairwise_output = torch.sigmoid(5 * (outputt - output_)) * mask
 
         target1 = torch.zeros(mask.size()).to('cuda')
         for i in range(target1.size(0)):
