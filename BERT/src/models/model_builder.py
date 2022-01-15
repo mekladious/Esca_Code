@@ -412,7 +412,7 @@ class HybridSummarizer(nn.Module):
         # [batchsize * (tgt_len - 1) * hidden_size]
         # projected into the probability distribution of vocab_size from hidden state.
         decoder_outputs, encoder_state, y_emb = self.abstractor(src, tgt, segs, clss, mask_src, mask_tgt, mask_cls)
-        src_pad_mask = (~mask_src).unsqueeze(1).repeat(1, tgt.size(1) - 1, 1)
+        src_pad_mask = (1 - mask_src).unsqueeze(1).repeat(1, tgt.size(1) - 1, 1)
         context_vector, attn_dist = self.context_attn(encoder_state, encoder_state, decoder_outputs, mask=src_pad_mask, type="context")
         if self.args.hybrid_connector:
             sorted_scores, sorted_scores_idx = torch.sort(ext_scores, dim=1, descending=True)
