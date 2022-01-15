@@ -238,21 +238,23 @@ class ExtSummarizer(nn.Module):
             true_dim = int(sent_num[i])
             tmp_D = D[:true_dim, :true_dim]
             tmp_q = q[:true_dim, :true_dim]
-            try:
-                D_ = torch.inverse(tmp_D)
-                I = torch.eye(true_dim).to(self.device)
-                y = torch.ones(true_dim, 1).to(self.device) * (1.0 / true_dim)
-                Final_score = torch.mm((1 - self.lamb) * torch.inverse(I - self.lamb * torch.mm(tmp_q, D_)), y).transpose(0,1)
-                len_ = D.size(0) - true_dim
-                tmp_zeros = torch.zeros(1, len_).to(self.device)
-                Final_score = torch.cat((Final_score, tmp_zeros), dim=1)
+            a, b = tmp_D.shape
+            # i = np.eye(a, a)
+            D_ = torch.linalg.pinv(tmp_D)
+            # D_ = torch.inverse(tmp_D)
+            I = torch.eye(true_dim).to(self.device)
+            y = torch.ones(true_dim, 1).to(self.device) * (1.0 / true_dim)
+            Final_score = torch.mm((1 - self.lamb) * torch.inverse(I - self.lamb * torch.mm(tmp_q, D_)), y).transpose(0,1)
+            len_ = D.size(0) - true_dim
+            tmp_zeros = torch.zeros(1, len_).to(self.device)
+            Final_score = torch.cat((Final_score, tmp_zeros), dim=1)
 
-                if i == 0:
-                    score_gather += Final_score
-                else:
-                    score_gather = torch.cat((score_gather, Final_score), 0)
-            except:
-                pass
+            if i == 0:
+                score_gather += Final_score
+            else:
+                score_gather = torch.cat((score_gather, Final_score), 0)
+            # except:
+            #     pass
         return score_gather
 
     def forward(self, src, segs, clss, mask_src, mask_cls):
