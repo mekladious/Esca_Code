@@ -129,39 +129,41 @@ class Trainer(object):
         self._start_report_manager(start_time=total_stats.start_time)
 
         while step <= train_steps:
+            try:
+                reduce_counter = 0
+                for i, batch in enumerate(train_iter):
+                    if self.n_gpu == 0 or (i % self.n_gpu == self.gpu_rank):
+                        true_batchs.append(batch)
+                        normalization += batch.batch_size
+                        accum += 1
+                        if accum == self.grad_accum_count:
+                            reduce_counter += 1
+                            if self.n_gpu > 1:
+                                normalization = sum(distributed
+                                                    .all_gather_list
+                                                    (normalization))
 
-            reduce_counter = 0
-            for i, batch in enumerate(train_iter):
-                if self.n_gpu == 0 or (i % self.n_gpu == self.gpu_rank):
-                    true_batchs.append(batch)
-                    normalization += batch.batch_size
-                    accum += 1
-                    if accum == self.grad_accum_count:
-                        reduce_counter += 1
-                        if self.n_gpu > 1:
-                            normalization = sum(distributed
-                                                .all_gather_list
-                                                (normalization))
+                            self._gradient_accumulation(
+                                true_batchs, normalization, total_stats,
+                                report_stats)
 
-                        self._gradient_accumulation(
-                            true_batchs, normalization, total_stats,
-                            report_stats)
+                            report_stats = self._maybe_report_training(
+                                step, train_steps,
+                                self.optim.learning_rate,
+                                report_stats)
 
-                        report_stats = self._maybe_report_training(
-                            step, train_steps,
-                            self.optim.learning_rate,
-                            report_stats)
+                            true_batchs = []
+                            accum = 0
+                            normalization = 0
+                            if (step % self.save_checkpoint_steps == 0 and self.gpu_rank == 0):
+                                self._save(step)
 
-                        true_batchs = []
-                        accum = 0
-                        normalization = 0
-                        if (step % self.save_checkpoint_steps == 0 and self.gpu_rank == 0):
-                            self._save(step)
-
-                        step += 1
-                        if step > train_steps:
-                            break
-            train_iter = train_iter_fct()
+                            step += 1
+                            if step > train_steps:
+                                break
+                train_iter = train_iter_fct()
+            except:
+                step-=1
 
         return total_stats
 
