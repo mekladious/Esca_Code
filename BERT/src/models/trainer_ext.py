@@ -164,6 +164,7 @@ class Trainer(object):
                             if step > train_steps:
                                 break
                 except Exception as e:
+                    step+=1
                     logger.info(e)
                     # train_iter = train_iter_fct()
                     # step-=1
