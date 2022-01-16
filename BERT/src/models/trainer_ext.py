@@ -134,6 +134,7 @@ class Trainer(object):
                 logger.info("try")
                 reduce_counter = 0
                 for i, batch in enumerate(train_iter):
+                    logger.info("for loop")
                     if self.n_gpu == 0 or (i % self.n_gpu == self.gpu_rank):
                         true_batchs.append(batch)
                         normalization += batch.batch_size
@@ -166,7 +167,7 @@ class Trainer(object):
                 train_iter = train_iter_fct()
             except Exception as e:
                 logger.info(e)
-                # train_iter = train_iter_fct()
+                train_iter = train_iter_fct()
                 # step-=1
                 continue
 
