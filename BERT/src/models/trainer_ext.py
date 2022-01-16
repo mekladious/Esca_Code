@@ -166,6 +166,7 @@ class Trainer(object):
                 except Exception as e:
                     step+=1
                     logger.info(e)
+                    break
                     # train_iter = train_iter_fct()
                     # step-=1
                 # train_iter = train_iter_fct()
