@@ -129,9 +129,9 @@ class Trainer(object):
         self._start_report_manager(start_time=total_stats.start_time)
 
         while step <= train_steps:
-            print(step)
+            logger.info(step)
             try:
-                print("try")
+                logger.info("try")
                 reduce_counter = 0
                 for i, batch in enumerate(train_iter):
                     if self.n_gpu == 0 or (i % self.n_gpu == self.gpu_rank):
@@ -165,7 +165,7 @@ class Trainer(object):
                                 break
                 train_iter = train_iter_fct()
             except Exception as e:
-                print(e)
+                logger.info(e)
                 # train_iter = train_iter_fct()
                 # step-=1
                 continue
