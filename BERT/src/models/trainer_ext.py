@@ -164,8 +164,9 @@ class Trainer(object):
                 train_iter = train_iter_fct()
             except Exception as e:
                 print(e)
-                train_iter = train_iter_fct()
-                step-=1
+                # train_iter = train_iter_fct()
+                # step-=1
+                continue
 
         return total_stats
 
