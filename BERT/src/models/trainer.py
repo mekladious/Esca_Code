@@ -15,7 +15,7 @@ def _tally_parameters(model):
     return n_params
 
 
-def build_trainer(args, device_id, model, optims,loss):
+def build_trainer(args, device_id, model, optim):
     """
     Simplify `Trainer` creation based on user `opt`s*
     Args:
@@ -28,7 +28,6 @@ def build_trainer(args, device_id, model, optims,loss):
         model_saver(:obj:`onmt.models.ModelSaverBase`): the utility object
             used to save the model
     """
-    device = "cpu" if args.visible_gpus == '-1' else "cuda"
 
     grad_accum_count = args.accum_count
     n_gpu = args.world_size
@@ -47,9 +46,9 @@ def build_trainer(args, device_id, model, optims,loss):
 
     report_manager = ReportMgr(args.report_every, start_time=-1, tensorboard_writer=writer)
 
+    trainer = Trainer(args, model, optim, grad_accum_count, n_gpu, gpu_rank, report_manager)
 
-    trainer = Trainer(args, model, optims, loss, grad_accum_count, n_gpu, gpu_rank, report_manager)
-
+    # print(tr)
     if (model):
         n_params = _tally_parameters(model)
         logger.info('* number of parameters: %d' % n_params)
