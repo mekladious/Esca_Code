@@ -2,23 +2,18 @@ import copy
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from pytorch_transformers import BertModel, BertConfig
 from torch.nn.init import xavier_uniform_
 
 from models.decoder import TransformerDecoder
 from models.encoder import Classifier, ExtTransformerEncoder
 from models.optimizers import Optimizer
-from models.neural import MultiHeadedAttention
-from torch.autograd import Variable
-
 
 def build_optim(args, model, checkpoint):
     """ Build optimizer """
+
     if checkpoint is not None:
-        # print('checkpoint ', checkpoint)
-        # exit()
-        optim = checkpoint['optims'][0]
+        optim = checkpoint['optim'][0]
         saved_optimizer_state_dict = optim.optimizer.state_dict()
         optim.optimizer.load_state_dict(saved_optimizer_state_dict)
         if args.visible_gpus != '-1':
@@ -41,8 +36,8 @@ def build_optim(args, model, checkpoint):
 
     optim.set_parameters(list(model.named_parameters()))
 
-    return optim
 
+    return optim
 
 def build_optim_bert(args, model, checkpoint):
     """ Build optimizer """
@@ -61,17 +56,19 @@ def build_optim_bert(args, model, checkpoint):
             raise RuntimeError(
                 "Error: loaded Adam optimizer from existing model" +
                 " but optimizer state is empty")
+
     else:
         optim = Optimizer(
             args.optim, args.lr_bert, args.max_grad_norm,
             beta1=args.beta1, beta2=args.beta2,
             decay_method='noam',
             warmup_steps=args.warmup_steps_bert)
-    params = [(n, p) for n, p in list(model.named_parameters()) if ('bert.model' in n) or ('xtractor' in n)]
+
+    params = [(n, p) for n, p in list(model.named_parameters()) if n.startswith('bert.model')]
     optim.set_parameters(params)
 
-    return optim
 
+    return optim
 
 def build_optim_dec(args, model, checkpoint):
     """ Build optimizer """
@@ -97,14 +94,16 @@ def build_optim_dec(args, model, checkpoint):
             beta1=args.beta1, beta2=args.beta2,
             decay_method='noam',
             warmup_steps=args.warmup_steps_dec)
-    params = [(n, p) for n, p in list(model.named_parameters()) if not (('bert.model' in n) or ('xtractor' in n))]
+
+    params = [(n, p) for n, p in list(model.named_parameters()) if not n.startswith('bert.model')]
     optim.set_parameters(params)
+
 
     return optim
 
 
-def get_generator(vocab_size, dec_hidden_size, device, task):
-    gen_func = nn.Softmax(dim=-1)
+def get_generator(vocab_size, dec_hidden_size, device):
+    gen_func = nn.LogSoftmax(dim=-1)
     generator = nn.Sequential(
         nn.Linear(dec_hidden_size, vocab_size),
         gen_func
@@ -113,7 +112,6 @@ def get_generator(vocab_size, dec_hidden_size, device, task):
 
     return generator
 
-
 class Bert(nn.Module):
     def __init__(self, large, temp_dir, finetune=False):
         super(Bert, self).__init__()
@@ -121,6 +119,7 @@ class Bert(nn.Module):
             self.model = BertModel.from_pretrained('bert-large-uncased', cache_dir=temp_dir)
         else:
             self.model = BertModel.from_pretrained('bert-base-uncased', cache_dir=temp_dir)
+
         self.finetune = finetune
 
     def forward(self, x, segs, mask):
@@ -134,16 +133,12 @@ class Bert(nn.Module):
 
 
 class ExtSummarizer(nn.Module):
-    def __init__(self, args, device, checkpoint, lamb=0.8):
+    def __init__(self, args, device, checkpoint):
         super(ExtSummarizer, self).__init__()
         self.args = args
         self.device = device
-        self.lamb = lamb
-        # if args.
-        # bert
         self.bert = Bert(args.large, args.temp_dir, args.finetune_bert)
 
-        # Extraction layer.
         self.ext_layer = ExtTransformerEncoder(self.bert.model.config.hidden_size, args.ext_ff_size, args.ext_heads,
                                                args.ext_dropout, args.ext_layers)
         if (args.encoder == 'baseline'):
@@ -158,24 +153,9 @@ class ExtSummarizer(nn.Module):
             my_pos_embeddings.weight.data[512:] = self.bert.model.embeddings.position_embeddings.weight.data[-1][None,:].repeat(args.max_pos-512,1)
             self.bert.model.embeddings.position_embeddings = my_pos_embeddings
 
-        # initial the parameter for infor\rel\novel.
-        self.W_cont = nn.Parameter(torch.Tensor(1 ,self.bert.model.config.hidden_size))
-        self.W_sim = nn.Parameter(torch.Tensor(self.bert.model.config.hidden_size, self.bert.model.config.hidden_size))
-        self.Sim_layer= nn.Linear(self.bert.model.config.hidden_size,self.bert.model.config.hidden_size)
-        self.W_rel = nn.Parameter(torch.Tensor(self.bert.model.config.hidden_size, self.bert.model.config.hidden_size))
-        self.Rel_layer= nn.Linear(self.bert.model.config.hidden_size,self.bert.model.config.hidden_size)
-        self.W_novel = nn.Parameter(torch.Tensor(self.bert.model.config.hidden_size, self.bert.model.config.hidden_size))
-        self.b_matrix = nn.Parameter(torch.Tensor(1, 1))
-
-        self.q_transform = nn.Linear(100, 1)
-        self.bq = nn.Parameter(torch.Tensor(1, 1))
-        self.brel = nn.Parameter(torch.Tensor(1, 1))
-        self.bsim = nn.Parameter(torch.Tensor(1, 1))
-        self.bcont = nn.Parameter(torch.Tensor(1, 1))
 
         if checkpoint is not None:
             self.load_state_dict(checkpoint['model'], strict=True)
-            print("checkpoint loaded! ")
         else:
             if args.param_init != 0.0:
                 for p in self.ext_layer.parameters():
@@ -184,95 +164,15 @@ class ExtSummarizer(nn.Module):
                 for p in self.ext_layer.parameters():
                     if p.dim() > 1:
                         xavier_uniform_(p)
-                for p in self.Rel_layer.parameters():
-                    if p.dim() > 1:
-                        xavier_uniform_(p)
-                for p in self.Sim_layer.parameters():
-                    if p.dim() > 1:
-                        xavier_uniform_(p)
-            nn.init.xavier_uniform_(self.bq)
-            nn.init.xavier_uniform_(self.W_cont)
-            nn.init.xavier_uniform_(self.W_sim)
-            nn.init.xavier_uniform_(self.W_rel)
-            nn.init.xavier_uniform_(self.W_novel)
-            nn.init.xavier_uniform_(self.b_matrix)
-            nn.init.xavier_uniform_(self.bcont)
-            nn.init.xavier_uniform_(self.brel)
-            nn.init.xavier_uniform_(self.bsim)
+
         self.to(device)
 
-    def cal_matrix0(self, sent_vec, mask_cls):
-
-        mask_cls = mask_cls.unsqueeze(1).float()
-        mask_my_own = torch.bmm(mask_cls.transpose(1, 2), mask_cls)
-        sent_num = mask_cls.sum(dim=2).squeeze(1)
-        d_rep = sent_vec.mean(dim=1).unsqueeze(1).transpose(1, 2)
-        score_gather = torch.zeros(1, sent_vec.size(1)).to(self.device)
-        #  for each of bach.
-        for i in range(sent_vec.size(0)):
-            Score_Cont = torch.mm(self.W_cont, sent_vec[i].transpose(0, 1))
-
-            tmp_Sim = torch.mm(sent_vec[i], self.W_sim)
-            Score_Sim = torch.mm(tmp_Sim, sent_vec[i].transpose(0, 1)) * mask_my_own[i]
-
-            tmp_rel = torch.mm(sent_vec[i], self.W_rel)
-            Score_rel = torch.mm(tmp_rel, d_rep[i]).transpose(0, 1)
-
-            q = Score_rel + Score_Cont + Score_Sim + self.b_matrix
-            q = q * mask_my_own[i]
-            tmp_nov = torch.mm(sent_vec[i][0].unsqueeze(0), self.W_novel)
-
-            accumulation = torch.mm(tmp_nov, torch.tanh(
-                ((q[0].sum() / sent_num[i]) * sent_vec[i][0]).unsqueeze(0).transpose(0, 1)))
-            for j, each_row in enumerate(q):
-                if j == 0:
-                    continue
-                q[j] = (q[j] + accumulation) * mask_cls[i]
-                tmp_nov = torch.mm(sent_vec[i][j].unsqueeze(0), self.W_novel)
-                accumulation += torch.mm(tmp_nov, torch.tanh(
-                    ((q[j].sum() / sent_num[i]) * sent_vec[i][j]).unsqueeze(0).transpose(0, 1)))
-            q = torch.sigmoid(q) * mask_my_own[i]
-
-            sum_vec = q.sum(dim=0)
-            D = torch.diag_embed(sum_vec)
-            true_dim = int(sent_num[i])
-            tmp_D = D[:true_dim, :true_dim]
-            tmp_q = q[:true_dim, :true_dim]
-            a, b = tmp_D.shape
-            # i = np.eye(a, a)
-            # D_ = torch.pinverse(tmp_D)
-            D_ = torch.inverse(tmp_D)
-            I = torch.eye(true_dim).to(self.device)
-            y = torch.ones(true_dim, 1).to(self.device) * (1.0 / true_dim)
-            Final_score = torch.mm((1 - self.lamb) * torch.inverse(I - self.lamb * torch.mm(tmp_q, D_)), y).transpose(0,1)
-            len_ = D.size(0) - true_dim
-            tmp_zeros = torch.zeros(1, len_).to(self.device)
-            Final_score = torch.cat((Final_score, tmp_zeros), dim=1)
-
-            if i == 0:
-                score_gather += Final_score
-            else:
-                score_gather = torch.cat((score_gather, Final_score), 0)
-
-        return score_gather
-
     def forward(self, src, segs, clss, mask_src, mask_cls):
-        # first bert layer get the top_vector, first dim is batch_size.
-        # [batch * max_length]
         top_vec = self.bert(src, segs, mask_src)
-        # get the vector of sentences.
         sents_vec = top_vec[torch.arange(top_vec.size(0)).unsqueeze(1), clss]
         sents_vec = sents_vec * mask_cls[:, :, None].float()
-        # [batchsize * sentencenum * dim]
-
-        sents_vec = self.ext_layer(sents_vec, mask_cls).squeeze(-1)
-        sent_scores = self.cal_matrix0(sents_vec, mask_cls)
-        # get the score of sentences, for abstractor.
-        # [batchsize * sentencenum]
-        if self.args.task == "ext":
-            return sent_scores, mask_cls
-        elif self.args.task == "hybrid":
-            return sent_scores, mask_cls, sents_vec
+        sent_scores = self.ext_layer(sents_vec, mask_cls).squeeze(-1)
+        return sent_scores, mask_cls
 
 
 class AbsSummarizer(nn.Module):
@@ -309,11 +209,11 @@ class AbsSummarizer(nn.Module):
             self.args.dec_hidden_size, heads=self.args.dec_heads,
             d_ff=self.args.dec_ff_size, dropout=self.args.dec_dropout, embeddings=tgt_embeddings)
 
-        self.generator = get_generator(self.vocab_size, self.args.dec_hidden_size, device, self.args.task)
+        self.generator = get_generator(self.vocab_size, self.args.dec_hidden_size, device)
         self.generator[0].weight = self.decoder.embeddings.weight
 
+
         if checkpoint is not None:
-            print("Abstractor is loading.")
             self.load_state_dict(checkpoint['model'], strict=True)
         else:
             for module in self.decoder.modules():
@@ -334,20 +234,15 @@ class AbsSummarizer(nn.Module):
                 tgt_embeddings.weight = copy.deepcopy(self.bert.model.embeddings.word_embeddings.weight)
                 self.decoder.embeddings = tgt_embeddings
                 self.generator[0].weight = self.decoder.embeddings.weight
+
         self.to(device)
 
     def forward(self, src, tgt, segs, clss, mask_src, mask_tgt, mask_cls):
         top_vec = self.bert(src, segs, mask_src)
         dec_state = self.decoder.init_decoder_state(src, top_vec)
-        if self.args.task == "abs":
-            decoder_outputs, state = self.decoder(tgt[:, :-1], top_vec, dec_state)
-            return decoder_outputs, None
-        elif self.args.task == 'hybrid':
-            decoder_outputs, state, y_embed = self.decoder(tgt[:, :-1], top_vec, dec_state, need_y_emb=True)
-            return decoder_outputs, top_vec, y_embed
-
-
-class HybridSummarizer(nn.Module):
+        decoder_outputs, state = self.decoder(tgt[:, :-1], top_vec, dec_state)
+        return decoder_outputs, None
+        class HybridSummarizer(nn.Module):
     def __init__(self, args, device, checkpoint = None, checkpoint_ext = None, checkpoint_abs = None):
         super(HybridSummarizer, self).__init__()
         self.args = args
