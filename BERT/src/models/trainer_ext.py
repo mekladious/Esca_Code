@@ -17,7 +17,7 @@ import distributed
 from models import data_loader, model_builder
 from models.data_loader import load_dataset
 from models.model_builder import ExtSummarizer
-from models.trainer_ext import build_trainer
+from models.trainer import build_trainer
 from others.logging import logger, init_logger
 
 model_flags = ['hidden_size', 'ff_size', 'heads', 'inter_layers', 'encoder', 'ff_actv', 'use_interval', 'rnn_size']
