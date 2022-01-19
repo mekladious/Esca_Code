@@ -242,7 +242,8 @@ class AbsSummarizer(nn.Module):
         dec_state = self.decoder.init_decoder_state(src, top_vec)
         decoder_outputs, state = self.decoder(tgt[:, :-1], top_vec, dec_state)
         return decoder_outputs, None
-        class HybridSummarizer(nn.Module):
+        
+class HybridSummarizer(nn.Module):
     def __init__(self, args, device, checkpoint = None, checkpoint_ext = None, checkpoint_abs = None):
         super(HybridSummarizer, self).__init__()
         self.args = args
