@@ -175,16 +175,12 @@ if __name__ == '__main__':
                 step = 0
                 test_text_abs(args, device_id, cp, step)
 
-    # train for extractor, In order to get a better fine-grained matrix parameter.
     elif (args.task == 'ext'):
         if (args.mode == 'train'):
-            # Running the training extraction function.
             train_ext(args, device_id)
         elif (args.mode == 'validate'):
-            # Run the validation extraction function.
             validate_ext(args, device_id)
         if (args.mode == 'test'):
-            # Run the test extraction function.
             cp = args.test_from
             try:
                 step = int(cp.split('.')[-2].split('_')[-1])
