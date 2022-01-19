@@ -11,9 +11,8 @@ from models.optimizers import Optimizer
 
 def build_optim(args, model, checkpoint):
     """ Build optimizer """
-
     if checkpoint is not None:
-        optim = checkpoint['optim'][0]
+        optim = checkpoint['optims'][0]
         saved_optimizer_state_dict = optim.optimizer.state_dict()
         optim.optimizer.load_state_dict(saved_optimizer_state_dict)
         if args.visible_gpus != '-1':
@@ -35,7 +34,6 @@ def build_optim(args, model, checkpoint):
             warmup_steps=args.warmup_steps)
 
     optim.set_parameters(list(model.named_parameters()))
-
 
     return optim
 
